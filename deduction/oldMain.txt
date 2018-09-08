@@ -1,0 +1,286 @@
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+
+public class Main {
+
+    public static ArrayList<Expression> given;
+    public static ArrayList<Expression> gamma;
+
+    public static ArrayList<String> built;
+
+    public static Expression alpha = null;
+    public static BufferedReader br = null;
+
+
+    public static void main(String[] args) {
+        given = new ArrayList<Expression>();
+        gamma = new ArrayList<Expression>();
+        built = new ArrayList<String>();
+
+        try {
+            BufferedReader in = Files.newBufferedReader(Paths.get("input.txt"), Charset.forName("UTF-8"));
+            BufferedWriter out = Files.newBufferedWriter(Paths.get("output.txt"), Charset.forName("UTF-8"));
+
+            readHW2();
+
+        } catch (IOException ignored) {
+        }
+    }
+
+
+    public static void readHW2() {
+        String curLine = null;
+        try {
+            curLine = br.readLine();
+        } catch (IOException exc) {
+            System.out.println("something goes wrong");
+            System.exit(0);
+        }
+
+        int p = 0;
+        while ((p = curLine.indexOf(",")) != -1) {
+            //given.add(Parser.parse(curLine.substring(0, p)));
+            gamma.add(Parser.parse(curLine.substring(0, p)));
+            curLine = curLine.substring(p + 1);
+        }
+
+        p = curLine.indexOf("|-");
+
+        alpha = Parser.parse(curLine.substring(0, p));
+        String a = alpha.s;   // сразу прочитать а было нельзя, потому что скобки
+
+        try {
+            while ((curLine = br.readLine()) != null) {
+                if ("".equals(curLine))
+                    continue;
+                if (curLine.charAt(0) == '#')
+                    continue;
+
+                Expression expression = Parser.parse(curLine);
+                if (expression == null) {
+                    System.out.println("something goes wrong with parsing!!");
+                    System.out.println(curLine);
+                }
+
+                String di = expression.s;
+
+                switch (checkExpr(expression)) {
+                    case 1:  // axiom or given
+                        //built.add("#case1: " + di);
+                        built.add(di);
+                        built.add(di + "->(" + a + "->" + di + ")");
+                        built.add(a + "->" + di);
+                        break;
+                    case 2: // di equals to a
+                        //built.add("#case2: " + di);
+                        built.add(a + "->(" + a + "->" + a + ")");
+                        built.add("(" + a + "->(" + a + "->" + a + ")" + ")" + "->" + "(" + a + "->((" + a + "->" + a + ")->" + a + "))" + "->" + "(" + a + "->" + a + ")");
+                        built.add("(" + a + "->((" + a + "->" + a + ")->" + a + "))" + "->" + "(" + a + "->" + a + ")");
+                        built.add("(" + a + "->((" + a + "->" + a + ")->" + a + "))");
+                        built.add(a + "->" + di);
+                        break;
+                    case 3:
+                        //built.add("#case3: " + di);
+                        String dj = (findLeft(expression));
+                        built.add("(" + a + "->" + dj + ")" + "->" + "((" + a + "->(" + dj + "->" + di + "))" + "->" + "(" + a + "->" + di + "))");
+                        built.add("((" + a + "->" + "(" + dj + "->" + di + "))" + "->" + "(" + a + "->" + di + "))");
+                        built.add(a + "->" + di);
+                        break;
+                }
+                given.add(expression);
+            }
+        } catch (IOException exc) {
+            System.out.println("something goes wrong");
+        }
+
+
+        for (String s : built) {
+            writer.println(s);
+        }
+    }
+
+    static String findLeft(Expression di) {
+        for (Expression dk : given) {
+
+            if (dk.getClass() == Impl.class && di.equals(((Impl) dk).rhs)) {
+
+                for (Expression dj : given) {
+                    if ((((Impl) dk).lhs).equals(dj)) {
+                        //built.add("#returned: dk=" + ((BinaryOperation) dk).s + " -+- " + "dj" + "=" + dj.s + "  -->  " + ((BinaryOperation) dk).rhs.s);
+                        return ((BinaryOperation) dk).lhs.s;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    static int checkExpr(Expression e) {
+        if (Axiom1(e)) return 1;
+        if (Axiom2(e)) return 1;
+        if (Axiom3(e)) return 1;
+        if (Axiom4(e)) return 1;
+        if (Axiom5(e)) return 1;
+        if (Axiom6(e)) return 1;
+        if (Axiom7(e)) return 1;
+        if (Axiom8(e)) return 1;
+        if (Axiom9(e)) return 1;
+        if (Axiom10(e)) return 1;
+
+        for (Expression d : gamma) {
+            if (d.equals(e)) {
+                return 1;
+            }
+        }
+
+        if (e.equals(alpha)) {
+            return 2;
+        }
+
+        return 3;
+    }
+
+
+    private static boolean Axiom1(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Impl.class)
+        {
+            Expression x = ((BinaryOperation) e).lhs;
+
+            return ((BinaryOperation) (((BinaryOperation) e).rhs)).rhs.equals(x);
+        }
+
+        return false;
+    }
+
+    private static boolean Axiom2(Expression e) {
+        if (e.getClass() != Impl.class) {
+            return false;
+        }
+
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) e).rhs).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) e).rhs).rhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs.getClass() == Impl.class
+                ) {
+            Expression a, b, c;
+            a = ((BinaryOperation) ((BinaryOperation) e).lhs).lhs;
+            b = ((BinaryOperation) ((BinaryOperation) e).lhs).rhs;
+            c = ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs).rhs;
+
+            return ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).lhs.equals(a) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).lhs.equals(a) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).rhs.equals(c) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs).lhs.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom3(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) e).rhs).rhs.getClass() == And.class) {
+            Expression a = ((BinaryOperation) e).lhs;
+            Expression b = ((BinaryOperation) ((BinaryOperation) e).rhs).lhs;
+            return ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).lhs.equals(a) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).rhs.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom4(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == And.class) {
+            Expression a = ((BinaryOperation) ((BinaryOperation) e).lhs).lhs;
+            return ((BinaryOperation) e).rhs.equals(a);
+        }
+        return false;
+    }
+
+    private static boolean Axiom5(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == And.class) {
+            Expression b = ((BinaryOperation) ((BinaryOperation) e).lhs).rhs;
+            return ((BinaryOperation) e).rhs.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom6(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Or.class) {
+            Expression a = ((BinaryOperation) ((BinaryOperation) e).rhs).lhs;
+            return ((BinaryOperation) e).lhs.equals(a);
+        }
+        return false;
+    }
+
+    private static boolean Axiom7(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Or.class) {
+            Expression b = ((BinaryOperation) ((BinaryOperation) e).rhs).rhs;
+            return ((BinaryOperation) e).lhs.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom8(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Impl.class &&
+
+                ((BinaryOperation) ((BinaryOperation) e).rhs).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) e).rhs).rhs.getClass() == Impl.class &&
+
+                ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).lhs.getClass() == Or.class) {
+            Expression a, b, c;
+            a = ((BinaryOperation) ((BinaryOperation) e).lhs).lhs;
+            c = ((BinaryOperation) ((BinaryOperation) e).lhs).rhs;
+            b = ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).lhs;
+
+            return ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs.equals(c) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).rhs.equals(c) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).lhs).lhs.equals(a) &&
+                    ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).lhs).rhs.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom9(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) e).rhs.getClass() == Impl.class &&
+
+                ((BinaryOperation) ((BinaryOperation) e).rhs).lhs.getClass() == Impl.class &&
+                ((BinaryOperation) ((BinaryOperation) e).rhs).rhs.getClass() == Not.class &&
+                ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs.getClass() == Not.class)
+
+        {
+            Expression a, b;
+            a = ((BinaryOperation) ((BinaryOperation) e).lhs).lhs;
+            b = ((BinaryOperation) ((BinaryOperation) e).lhs).rhs;
+
+            return (((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).lhs).equals(a) &&
+                    ((Not) ((BinaryOperation) ((BinaryOperation) e).rhs).rhs).exp.equals(a) &&
+                    ((Not) ((BinaryOperation) ((BinaryOperation) ((BinaryOperation) e).rhs).lhs).rhs).exp.equals(b);
+        }
+        return false;
+    }
+
+    private static boolean Axiom10(Expression e) {
+        if (e.getClass() == Impl.class &&
+                ((BinaryOperation) e).lhs.getClass() == Not.class &&
+                ((Not) ((BinaryOperation) e).lhs).exp.getClass() == Not.class) {
+
+            if (((Not) ((BinaryOperation) e).lhs).exp.getClass() == Not.class) {
+                return ((Not) (((Not) ((BinaryOperation) e).lhs).exp)).exp.equals(((BinaryOperation) e).rhs);
+            }
+        }
+        return false;
+    }
+}
